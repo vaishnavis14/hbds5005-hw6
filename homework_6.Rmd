@@ -1,0 +1,306 @@
+---
+title: "Homework 6"
+author: "Vaishnavi Sathiyamoorthy"
+date: "2024-10-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 2. Effect of a cholesterol lowering drug revisited
+An astute colleague reminds you that the t-distribution is only appropriate if the data are approximately normally distributed. For small sample sizes, the only way to really determine this is to examine the data for outliers. Looking at the data, there does appear to be an outlier value (the value of 92). Hence, we are now concerned whether the p-value reported in Question 1 is accurate. We will determine this using a bootstrapped distribution for the test statistic. Recall that when we used the t-distribution above, we assume that distribution of the standardized sample mean (the t-statistic) had a t-distribution with 9 degrees of freedom. To calculate the t-statistic, we use the formula:
+
+Note that in this case the hypothesized value for the mean difference for the null hypothesis is 0, so μ0 = 0.
+
+## Question 2a.
+
+Generate a boot strap sampling distribution for t using the data in question 1. Use 10,000 bootstrapped samples.
+
+**Answer**
+
+```{r}
+library(boot)
+data <- c(-68, -38, -32, -5, 92, -6, -58, -21, -41, -66)
+bootstrap_t <- numeric(10000)
+for (i in 1:10000) {
+  bootstrap_sample <- sample(data, 10, replace = TRUE)
+  bootstrap_mean <- mean(bootstrap_sample)
+  bootstrap_sd <- sd(bootstrap_sample)
+  bootstrap_t[i] <- (bootstrap_mean) / (bootstrap_sd / sqrt(10))
+}
+```
+
+## Question 2b.
+
+Plot the density for the bootstrapped sampling distribution for the t-statistic and overlay the density for the t-distribution with 9 degrees of freedom.
+
+**Answer**
+
+```{r}
+library(tidyverse)
+t_density <- function(x) dt(x, df = 9)
+as.data.frame(bootstrap_t) %>%
+  ggplot(aes(x = bootstrap_t)) +
+  geom_histogram(aes(y = ..density..), bins = 50, 
+                 fill = "lightblue", color = "black", alpha = 0.6) +
+  stat_function(fun = t_density, color = "red", 
+                linetype = "dashed", size = 1) +
+  labs(title = "Bootstrapped t-Statistic vs. t-Distribution (df = 9)",
+       x = "t-Statistic", y = "Density") +
+  theme_minimal()
+```
+
+## Question 2c.
+
+Based on the plot in question 2b, Does it appear as though a t-distribution is a good approximation for the sampling distribution for the data in question 1? Explain.
+
+**Answer**
+
+Based on the plot, the t-distribution does not appear to be a good approximation for the sampling distribution. This is because the sampling distribution seems to have 2 modes.
+
+## Question 2d.
+
+Make a qq-plot for the bootstrap sampling distribution and a t-distribution with df = 9. Add the qq-line as well as the line of identity.
+
+**Answer**
+
+```{r}
+qqplot(qt(ppoints(10000), df = 9), bootstrap_t)
+qqline(bootstrap_t, distribution = function(p) qt(p, df = 9), col = "red", lwd = 2)
+```
+
+## Question 2f.
+
+Use the bootstrap BCa approach implemented in boot.ci function to calculate and report the one-sided 97.5% confidence interval for the population mean
+
+**Answer**
+
+```{r}
+library(boot)
+set.seed(123)
+bootProp <- function(data, idx) {
+  sample_data <- data[idx]
+  
+  sample_mean <- mean(sample_data)
+  sample_sd <- sd(sample_data)
+  
+  t_value <- sample_mean / (sample_sd / sqrt(length(sample_data)))
+}
+bootPropObj <- boot(data, bootProp, 10000)
+boot.ci(bootPropObj, conf = 0.975, type = 'bca')$bca[4]
+boot.ci(bootPropObj, conf = 0.975, type = 'bca')$bca[5]
+```
+
+## Question 2g.
+
+Based on the confidence interval in 2f, is there evidence at the 0.025 level of significance that the drug significantly lowers the cholesterol levels?
+
+**Answer**
+
+Based on the confidence interval, there os no evidence that the drug signficantly lowers cholesterol levels because 0 is included in the interval.
+
+# Question 5. Response to pain medication study design
+Determine a sample size
+
+A study team at Hospital for Special Surgery is interested in performing a clinical trial to evaluate the effectiveness of
+a newly developed pain reliever designed to reduce pain after joint replacement surgery. Patients will be randomized
+equally between the new pain reliever and the standard pain reliever. The patient and the person administering the
+drug and performing the pain evaluations will be blinded as to what drug is given to the patient. The pain level of
+each participant will be evaluated immediately prior to administering the randomly assigned pain reliever to the
+patient; this is the baseline value. Each patient will indicate her/his pain level on a scale of 0 to 10, where 0 is no
+pain, and 10 is the worst pain imaginable. Thirty minutes after receiving the pain reliever, the patient will again be
+asked to indicate her/his pain level on a scale of 0 to 10. If the pain level is lower at 30 minutes compared to baseline,
+this will be deemed a response. The study team wants to know how many patients they need in their trial.
+
+Some of the information they provide is the following:
+• the sample size of the two treatment groups will be equal
+• the response rate at 30 minutes after delivering the control pain reliever is 0.35
+• the study team is interested in being able to detect a minimum response rate at 30 minutes for the new pain
+reliever of 0.50
+• the investigators will be doing a two-sided test with α = 0.05
+What is the sample size needed (total sample size for the trial) if the investigators want to achieve 90% power?
+
+**Answer**
+
+```{r}
+library(EnvStats)
+propTestN(0.35, 0.5, 0.05, 0.9)
+```
+
+The sample size needed is 113.
+
+# Question 6. Phenformin and cardiovascular mortality
+
+Use a Fisher’s exact test to investigate the difference in CV morality between the two treatment groups. Use a 0.01 level of significance.
+
+## Question 6a.
+
+What is the null hypothesis?
+
+**Answer**
+
+$ H_0: $ Phenformin and Cardiovascular death have no association.
+
+## Question 6b.
+
+What is the alternative hypothesis?
+
+**Answer**
+
+$ H_A: $ There is an association between Phenformin and Cardiovascular death.
+
+## Question 6c.
+
+What is the p-value?
+
+**Answer**
+
+```{r}
+observed_values <- matrix(c(26, 178, 2, 62),
+                          nrow = 2,
+                          dimnames = list(c("CV Death", "Not a CV Death"), 
+                                          c("Phenformin", "Placebo")))
+chisq.test(observed_values)
+```
+
+The p-value is 0.0499.
+
+## Question 6d.
+
+What is your conclusion?
+
+**Answer**
+
+Since p > 0.01, we fail to reject the null hypothesis. We can conclude that there is no association between Phenformin and Cardiovascular death.
+
+# Question 7. Surgical apgar score and 30-day perioperative morbidity/mortality of pancreaticodudenectomy
+
+Pancreaticodudenectomy (PD) is a procedure that is associated with considerable morbidity. A study was recently conducted in 589 patients who had a successful PD between January 2009 and December 2019 to determine whether their Surgical Apgar Score (SAS) is related to 30-day perioperative morbidity and mortality. The data are in pd.xlsx. The variables are SAS which has the SAS in three ranges (higher the number the healthier the patient) and morbidity. The morbidity variable has three levels: none, which corresponds to no perioperative morbidity; minor, which corresponds to minor perioperative morbidity; and major, which corresponds to major perioperative morbidity or death.
+
+## Question 7a.
+
+What is the null hypothesis?
+
+**Answer**
+
+$H_0: $ There is no association between SAS and morbidity.
+
+## Question 7b.
+
+What is the alternative hypothesis?
+
+**Answer**
+
+$H_0: $ There is an association between SAS and morbidity.
+
+## Question 7c.
+
+What is the value of the chi-square statistic?
+
+**Answer**
+
+```{r}
+library(readxl)
+df <- read_excel("pd.xlsx")
+
+observed_values <- table(df)
+chisq.test(observed_values)
+```
+
+The chi-squared statistic is 20.408.
+
+## Question 7d.
+
+What is the p-value and what distribution was used to obtain it?
+
+**Answer**
+
+The p-value is 0.0004. This was obtained from the chi-squared distribution.
+
+## Question 7e.
+
+Is a chi-square test appropriate for this data? Explain.
+
+**Answer**
+
+The chi-squared test is appropriate for this data because the data is categorical, all observations are independent of each other, and all expected counts are ≥ 5.
+
+## Question 7f.
+
+Generate a mosaic plot that shows the association between the patient SAS and peri-operative morbidity outcome.
+
+**Answer**
+
+```{r}
+mosaicplot(table(df), shade=TRUE, main="Morbidity by SAS")
+```
+
+## Question 7g.
+
+What is your conclusion?
+
+**Answer**
+
+Those with SAS scores of 7-10 have less than expected major morbidities.
+
+# Question 8. Phenformin and cardiovascular death data analysis revisited
+
+For the data in Question 6, we used a Fisher’s exact test because the sample size was too small to meet the assumptions of a sampling distribution for either a difference in the proportions (which would be normal) or a chi-square distribution.
+
+We could have generated an approximate sampling distribution another way using what is called a randomization test. The null hypothesis is that the two population proportions are the same. If this is the case, then the groups to which the patients were randomized should not matter. So we can generate the sampling distribution for the difference in the proportion of patients who experience a CV death by randomly assigning each of the patients to the treatment and placebo groups and determining the difference in the proportion of patients who experience a CV death between the two groups. The data are in a file called trialData.csv. There are two variables: treatment, which indicates whether a patient is in the phenformin or placebo group, and CVdeath, which is equal to 1 if a patient experienced a CV death. Since the CVdeath variable is coded this way, we can get the proportion of patients who experience a CV death by taking the mean of CVdeath.
+
+```{r}
+data8 <- read.csv("trialData.csv")
+oDiff <- mean(data8[data8$treatment=="phenformin",2]) - mean(data8[data8$treatment=="placebo",2])
+#this randomly selects patients for phenformin
+set.seed(1039)
+phenRows <- sample(1:nrow(data8),204,replace=FALSE)
+#this computes the difference in proportions
+mean(data8[phenRows,2])-mean(data8[-phenRows,2])
+```
+
+## Question 8a.
+
+Generate a sampling distribution based on 7500 randomization for the difference in the proportion of patients in each group who experience a CV death assuming that there is no difference (i.e. assuming the null hypothesis is true) by randomly assigning patients to groups each time. Make a histogram of the approximate sampling distribution
+
+**Answer**
+
+```{r}
+get_diff <- function() {
+  phenRows <- sample(1:nrow(data8), 204, replace = FALSE)  # Randomly select 204 patients
+  diff <- mean(data8[phenRows, 2]) - mean(data8[-phenRows, 2])  # Compute the difference
+  return(diff)
+}
+set.seed(1039)
+random_diffs <- replicate(7500, get_diff())
+hist(random_diffs, 
+     main = "Sampling Distribution of Difference in Proportions\n(7500 Randomizations)", 
+     xlab = "Difference in Proportions", 
+     col = "skyblue", 
+     breaks = 50, 
+     border = "black")
+
+```
+
+## Question 8b.
+
+What is the p-value? To get a p-value for the test of significance, we can determine how many times we got a value as or more extreme than the one we observed in our data using the approximate sampling distribution we got in 8a, when we assumed the null hypothesis was true
+
+**Answer**
+
+```{r}
+oDiff <- mean(data8[data8$treatment == "phenformin", 2]) - 
+         mean(data8[data8$treatment == "placebo", 2])
+mean(abs(random_diffs) >= abs(oDiff))
+```
+
+## Question 8c.
+
+How does this p-value compare to the one in question 6c?
+
+**Answer**
+
+This p-value is slightly lower than the p-value from 6c.
+
